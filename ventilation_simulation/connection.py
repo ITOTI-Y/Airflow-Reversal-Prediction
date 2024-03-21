@@ -31,7 +31,12 @@ class Connection:
         self.flow = self.resistance * np.sqrt(abs(delta_p)) * np.sign(delta_p)
 
     def __repr__(self):
-        return f"Connection({self.node1.identifier} <-> {'External' if self.node2 is None else self.node2.identifier}, Flow: {self.flow})"
+        response = f"Connection({self.node1.identifier} <-> {'External' if self.node2 is None else self.node2.identifier}, Flow: {self.flow}, Resistance: {self.resistance}"
+        if self.node2 is None:
+            response += f", External Pressure: {self.external_pressure})"
+        else:
+            response += ")"
+        return response
     
 
 if __name__ == "__main__":
