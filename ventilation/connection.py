@@ -1,19 +1,22 @@
 import numpy as np
-
+import uuid
 class Connection:
-    def __init__(self, node1, node2, coefficient, outdoor_pressure=0):
-        
+    id_counter = 0
+    def __init__(self, node1, node2, coefficient, outdoor_pressure=None):
+        self.identifier = Connection.id_counter
+        Connection.id_counter += 1
         self.node1 = node1  # 连接的房间1
         self.node2 = node2  # 连接的房间2
         self.coefficient = coefficient  # 阻力系数
         self.outside_pressure = outdoor_pressure  # 室外风压
+        self.outside_concentration = 400 # 室外浓度
         self.flow = 0  # 气流流量,正值表示从room1流向room2,负值表示从room2流向room1
 
     def calculate_flow(self, pressure1, pressure2):
         # 根据风压差计算气流流量,使用Q=C*sqrt(ΔP)
         pressure_diff = pressure1 - pressure2
         result = self.coefficient * np.sign(pressure_diff) * np.sqrt(abs(pressure_diff))
-        return self.coefficient * np.sign(pressure_diff) * np.sqrt(abs(pressure_diff))
+        return result
 
     def update_flow(self):
         # 更新气流流量
@@ -25,5 +28,5 @@ class Connection:
                 self.node1.pressure, self.node2.pressure)
 
     def __repr__(self):
-        respond = f"Node {self.node1.identifier} <-> {'Node' + str(self.node2.identifier) if self.node2 else 'None'}, coefficient: {self.coefficient}, flow: {self.flow}"
+        respond = f"ID {self.identifier} Node {self.node1.identifier} <-> {'Node' + str(self.node2.identifier) if self.node2 else 'None'}, coefficient: {self.coefficient}, flow: {self.flow}"
         return respond
