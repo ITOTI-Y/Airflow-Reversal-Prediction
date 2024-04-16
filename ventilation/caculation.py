@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from typing import List
 from node import Node
 from connection import Connection
@@ -63,10 +64,10 @@ class Caculation:
     def concentration_calculation(self):
         delta_times = 1
         iterations = 1800
-        result_list = np.zeros((iterations, len(self.nodes)))
+        concentration_list = np.zeros((iterations, len(self.nodes)))
         for i in range(iterations):
             for j,node in enumerate(self.nodes):
-                result_list[i][j] = node.concentration
+                concentration_list[i][j] = node.concentration
                 pollutant_flow = node.people * self.HUMAN_EXHALATION_FLOW
                 for conn in self.connections:
                     if conn.node1 == node:
@@ -76,7 +77,27 @@ class Caculation:
                         if conn.flow >= 0:
                             pollutant_flow -= conn.flow * (node.concentration - conn.node2.concentration)
                 node.update_concentration((pollutant_flow/node.size)*delta_times + node.concentration)
-        return result_list
+        return concentration_list
+
+    def _random_people_number(self):
+        """
+        Generate a list of random people number for each node.
+        
+        Args:
+            lenght (int): The number of nodes.
+            sum_people (int): The total number of people.
+        
+        Returns:
+            list: A list of random people number for each node.
+        """
+        lenght = len(self.nodes)
+        sum_people = sum([node.people for node in self.nodes])
+        people_list = np.zeros(lenght)
+        while np.sum(people_list) < sum_people:
+            people_list[np.random.randint(lenght)] += 1
+        
+        for i,node in enumerate(self.nodes):
+            node.update_people(int(people_list[i]))
 
     def flow_balance(self):
         """
@@ -88,19 +109,39 @@ class Caculation:
         network = self.VentilationNetwork
         pressure_list = [0] * len(network.nodes)
         result = root(self.flow_equation, pressure_list) # 使用root函数求解非线性方程组
-        if result.success:
-            print('解：', result.x)
-        else:
-            print('找不到解。')
+        if not result.success:
+            raise ValueError("Flow balance calculation failed.")
         return result.x
+    
+    def _output_result(self,result:dict):
+        """
+        Output the result as datasets.
+        """
+        data = []
+        keys = ['pressure', 'concentration', 'people']
+        for key in result:
+            data.extend([{'Node': key, **dict(zip(keys, values))} for values in zip(result[key]['pressure'],result[key]['concentration'],result[key]['people'])])
+        df = pd.DataFrame(data)
+        return df
+    
+    def main(self,output_path:str=None):
+        """
+        Main function to run the calculation.
+        """
+        self.flow_balance()
+        result = {f'Node {node.identifier}': {'pressure':[node.pressure],'concentration':[node.concentration],'people':[node.people]} for node in self.nodes}
+        for _ in range(3):
+            concentration_list = self.concentration_calculation()
+            for i,node in enumerate(self.nodes):
+                result[f'Node {node.identifier}']['concentration'].extend(concentration_list[:,i])
+                self._random_people_number()
+                result[f'Node {node.identifier}']['people'].extend((np.ones_like(concentration_list[:,i])*node.people).astype(int))
+                result[f'Node {node.identifier}']['pressure'].extend([node.pressure]*len(concentration_list[:,i]))
+        if output_path:
+            df = self._output_result(result)
+            df.to_csv(output_path,index=False)
 
 if __name__ == '__main__':
     network = VentilationNetwork(5)
     caculation = Caculation(network)
-    caculation.flow_balance()
-    result1 = caculation.concentration_calculation()
-    network.visualize_network()
-    network.nodes[0].people = 1
-    # result2 = caculation.concentration_calculation()
-    pass
-    # print(network.nodes)
+    caculation.main()

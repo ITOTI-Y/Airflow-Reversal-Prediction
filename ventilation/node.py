@@ -1,7 +1,7 @@
 class Node:
     id_counter = 0
 
-    def __init__(self, size:float, people:int,initial_pressure:float = 0.0, initial_concentration:float = 400.0):
+    def __init__(self, size: float, people: int, initial_pressure: float = 0.0, initial_concentration: float = 400.0):
         self.identifier = Node.id_counter
         Node.id_counter += 1
         self.size = size  # 房间尺寸 m^3
@@ -9,7 +9,7 @@ class Node:
         self.pressure = initial_pressure  # 初始风压 Pa
         self.concentration = initial_concentration  # 初始浓度 ppm
 
-    def update_pressure(self, new_pressure):
+    def update_pressure(self, new_pressure:float):
         """
         Updates the air pressure in the room.
 
@@ -19,7 +19,7 @@ class Node:
         """
         self.pressure = new_pressure
 
-    def update_people(self, new_people):
+    def update_people(self, new_people:int):
         """
         Updates the people in the room.
 
@@ -29,7 +29,7 @@ class Node:
         """
         self.people = new_people
 
-    def update_concentration(self, new_concentration):
+    def update_concentration(self, new_concentration:float):
         """
         Updates the concentration in the room.
 
@@ -38,8 +38,6 @@ class Node:
 
         """
         self.concentration = new_concentration
-    
-
 
     def __repr__(self):
         respond = f'Node {self.identifier}, size: {self.size}, pressure: {self.pressure}, concentration: {self.concentration}'
