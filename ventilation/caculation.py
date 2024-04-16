@@ -7,6 +7,10 @@ from scipy.optimize import fsolve, root, differential_evolution
 
 
 class Caculation:
+    HUMAN_EXHALATION = 0.0001 # 人体潮气量 m^3/s
+    HUMAN_EXHALATION_CONCENTRATION = 40000 # 人体潮气二氧化碳浓度 ppm
+    HUMAN_EXHALATION_FLOW = HUMAN_EXHALATION * HUMAN_EXHALATION_CONCENTRATION # 人体潮气二氧化碳流量 ppm*m^3/s
+
     def __init__(self, VentilationNetwork: VentilationNetwork):
         """
         Initializes an instance of the Calculation class.
@@ -20,8 +24,8 @@ class Caculation:
             connections (list): The list of connections in the VentilationNetwork.
         """
         self.VentilationNetwork = VentilationNetwork
-        self.nodes = VentilationNetwork.nodes
-        self.connections = VentilationNetwork.connections
+        self.nodes:List[Node] = VentilationNetwork.nodes
+        self.connections:List[Connection] = VentilationNetwork.connections
     def flow_equation(self, pressure_list: list) -> list:
         """
         Calculates the flow equations for the given pressure list.
@@ -57,16 +61,22 @@ class Caculation:
         return equations
     
     def concentration_calculation(self):
-        delat_time = 60 # Time step in seconds
-        for node in self.nodes:
-            concentration_change = 0
-            for conn in self.connections:
-                if conn.node1 == node:
-                    concentration_change -= conn.flow * (node.co2 - conn.node2.co2 if conn.node2 else conn.outside_concentration)
-                elif conn.node2 == node:
-                    concentration_change += conn.flow * (node.co2 - conn.node1.co2)
-
-
+        delta_times = 1
+        iterations = 1800
+        result_list = np.zeros((iterations, len(self.nodes)))
+        for i in range(iterations):
+            for j,node in enumerate(self.nodes):
+                result_list[i][j] = node.concentration
+                pollutant_flow = node.people * self.HUMAN_EXHALATION_FLOW
+                for conn in self.connections:
+                    if conn.node1 == node:
+                        if conn.flow <= 0:
+                            pollutant_flow += conn.flow * (node.concentration - conn.node2.concentration if conn.node2 else node.concentration - conn.outside_concentration)
+                    elif conn.node2 == node:
+                        if conn.flow >= 0:
+                            pollutant_flow -= conn.flow * (node.concentration - conn.node2.concentration)
+                node.update_concentration((pollutant_flow/node.size)*delta_times + node.concentration)
+        return result_list
 
     def flow_balance(self):
         """
@@ -82,12 +92,15 @@ class Caculation:
             print('解：', result.x)
         else:
             print('找不到解。')
-        network.visualize_network()
         return result.x
 
 if __name__ == '__main__':
-    network = VentilationNetwork(1)
-    # network.visualize_network()
+    network = VentilationNetwork(5)
     caculation = Caculation(network)
     caculation.flow_balance()
-    print(network.nodes)
+    result1 = caculation.concentration_calculation()
+    network.visualize_network()
+    network.nodes[0].people = 1
+    # result2 = caculation.concentration_calculation()
+    pass
+    # print(network.nodes)

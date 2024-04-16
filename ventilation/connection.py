@@ -8,12 +8,12 @@ class Connection:
         self.node1 = node1  # 连接的房间1
         self.node2 = node2  # 连接的房间2
         self.coefficient = coefficient  # 阻力系数
-        self.outside_pressure = outdoor_pressure  # 室外风压
-        self.outside_concentration = 400 # 室外浓度
+        self.outside_pressure = outdoor_pressure  # 室外风压 Pa
+        self.outside_concentration = 400 # 室外浓度 ppm
         self.flow = 0  # 气流流量,正值表示从room1流向room2,负值表示从room2流向room1
 
     def calculate_flow(self, pressure1, pressure2):
-        # 根据风压差计算气流流量,使用Q=C*sqrt(ΔP)
+        # 根据风压差计算气流流量,使用Q=C*sqrt(ΔP) 流量单位是m^3/s
         pressure_diff = pressure1 - pressure2
         result = self.coefficient * np.sign(pressure_diff) * np.sqrt(abs(pressure_diff))
         return result

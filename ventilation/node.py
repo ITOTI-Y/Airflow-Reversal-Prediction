@@ -4,10 +4,10 @@ class Node:
     def __init__(self, size:float, people:int,initial_pressure:float = 0.0, initial_concentration:float = 400.0):
         self.identifier = Node.id_counter
         Node.id_counter += 1
-        self.size = size  # 房间尺寸
-        self.people = people  # 人数
-        self.pressure = initial_pressure  # 初始风压
-        self.concentration = initial_concentration  # 初始浓度
+        self.size = size  # 房间尺寸 m^3
+        self.people = people  # 人数 人
+        self.pressure = initial_pressure  # 初始风压 Pa
+        self.concentration = initial_concentration  # 初始浓度 ppm
 
     def update_pressure(self, new_pressure):
         """

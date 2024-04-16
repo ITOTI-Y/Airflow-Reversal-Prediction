@@ -41,20 +41,20 @@ class VentilationNetwork:
         for _ in range(node_num):
             self.nodes.append(Node(size = np.random.randint(45,60),people = np.random.randint(1,10)))
 
-        chosen_nodes = np.random.choice(self.nodes,np.random.randint(2,5),replace=False)
-        # for i in range(node_num):
-        #     if i == 0:
-        #         last_node = i
-        #     else:
-        #         coefficient = round(np.random.uniform(0.2,0.8),1)
-        #         self.connections.append(Connection(self.nodes[last_node],self.nodes[i],coefficient))
-        #         last_node = i
-        #         connection_num -= 1
-        # if connection_num != 0:
-        #     for i in range(int(connection_num)):
-        #         coefficient = round(np.random.uniform(0.2,0.8),1)
-        #         node1,node2 = np.random.choice(self.nodes,2,replace=False)
-        #         self.connections.append(Connection(node1,node2,coefficient))
+        # chosen_nodes = np.random.choice(self.nodes,np.random.randint(2,5),replace=False)
+        for i in range(node_num):
+            if i == 0:
+                last_node = i
+            else:
+                coefficient = round(np.random.uniform(0.2,0.8),1)
+                self.connections.append(Connection(self.nodes[last_node],self.nodes[i],coefficient))
+                last_node = i
+                connection_num -= 1
+        if connection_num != 0:
+            for i in range(int(connection_num)):
+                coefficient = round(np.random.uniform(0.2,0.8),1)
+                node1,node2 = np.random.choice(self.nodes,2,replace=False)
+                self.connections.append(Connection(node1,node2,coefficient))
         for i in range(outside_pressure.size):
             coefficient = round(np.random.uniform(0.2,0.8),1)
             self.connections.append(Connection(np.random.choice(self.nodes),None,coefficient,outside_pressure[i]))
@@ -96,7 +96,7 @@ class VentilationNetwork:
         edge_colors = []
         G = nx.MultiDiGraph()
         for _,node in enumerate(self.nodes):
-            G.add_node(node.identifier,pressure = f'{node.pressure:.2f}',co2 = f'{node.co2:.2f}')
+            G.add_node(node.identifier,pressure = f'{node.pressure:.2f}',concentration = f'{node.concentration:.2f}')
         for _,connection in enumerate(self.connections):
             if connection.node2 is not None:
                 G.add_edge(connection.node1.identifier,connection.node2.identifier,flow = f'{connection.flow:.2f}')
