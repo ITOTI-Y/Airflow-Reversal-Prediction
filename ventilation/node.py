@@ -9,36 +9,35 @@ class Node:
         self.pressure = initial_pressure  # 初始风压 Pa
         self.concentration = initial_concentration  # 初始浓度 ppm
 
-    def update_pressure(self, new_pressure:float):
+    def update_pressure(self, new_pressure: float):
         """
-        Updates the air pressure in the room.
+        更新房间的空气压力。
 
         Args:
-            new_pressure (float): The new air pressure value.
+            new_pressure (float): 新的空气压力值。
 
         """
         self.pressure = new_pressure
 
-    def update_people(self, new_people:int):
+    def update_people(self, new_people: int):
         """
-        Updates the people in the room.
+        更新房间的人数。
 
         Args:
-            new_people (int): The new people value.
+            new_people (int): 新的人数值。
 
         """
         self.people = new_people
 
-    def update_concentration(self, new_concentration:float):
+    def update_concentration(self, new_concentration: float):
         """
-        Updates the concentration in the room.
+        更新房间的浓度。
 
         Args:
-            new_concentration (float): The new concentration value.
+            new_concentration (float): 新的浓度值。
 
         """
         self.concentration = new_concentration
 
-    def __repr__(self):
-        respond = f'Node {self.identifier}, size: {self.size}, pressure: {self.pressure}, concentration: {self.concentration}'
-        return respond
+    def __repr__(self) -> str:
+        return f'Node {self.identifier}, size: {self.size}, pressure: {self.pressure}, concentration: {self.concentration}'
