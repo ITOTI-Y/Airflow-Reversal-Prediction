@@ -62,11 +62,10 @@ class Connection:
 
         The method updates the air flow in the connection by calculating the flow based on the current pressures in the nodes.
         """
-        # 更新气流流量
-        if self.node2 is None:  # 与室外相连
+        if self.node2 is None:
             self.flow = self.calculate_flow(
                 self.node1.pressure, self.outside_pressure)
-        else:  # 与另一个房间相连
+        else:
             self.flow = self.calculate_flow(
                 self.node1.pressure, self.node2.pressure)
 

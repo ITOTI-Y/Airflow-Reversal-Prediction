@@ -13,7 +13,8 @@ class VentilationNetwork:
         connections (list): A list of Connection objects representing the connections between rooms.
 
     Methods:
-        create_random_network(): Creates a random network of nodes and connections.
+        _create_random_network(): Creates a random network of nodes and connections.
+        _build_connection_matrix(): Builds a connection matrix for the network.
         random_people_number(): Generates a list of random people number for each node.
         draw_multiedge_labels(pos, edge_labels, ax, font_size): Draws labels for multiple edges on a graph.
         visualize_network(): Visualizes the network by creating a graph representation of the nodes and connections.
@@ -29,21 +30,22 @@ class VentilationNetwork:
             np.random.seed(seed)
         self.nodes = []  # 房间列表
         self.connections = []  # 连接列表
-        self.create_random_network()
+        self._create_random_network()
+        self.connection_matrix = self._build_connection_matrix()
 
-    def create_random_network(self):
+    def _create_random_network(self):
         """Creates a random network of nodes and connections.
 
         The method generates a random network by creating a specified number of nodes
         and connecting them with random coefficients. It also assigns random outside
         pressures to some connections.
         """
-        node_num = np.random.randint(4, 20)
+        node_num = np.random.randint(4, 12)
         connection_num = (np.random.uniform(1.5, 2) * node_num) // 1
         outside_pressure = np.random.randint(1, 10, np.random.randint(2, 5))
         for _ in range(node_num):
             self.nodes.append(Node(size=np.random.randint(
-                45, 60), people=np.random.randint(1, 10)))
+                25, 60), people=np.random.randint(1, 10)))
 
         # chosen_nodes = np.random.choice(self.nodes,np.random.randint(2,5),replace=False)
         for i in range(node_num):
@@ -64,6 +66,18 @@ class VentilationNetwork:
             coefficient = round(np.random.uniform(0.2, 0.8), 1)
             self.connections.append(Connection(np.random.choice(
                 self.nodes), None, coefficient, outside_pressure[i]))
+
+    def _build_connection_matrix(self):
+        """Builds a connection matrix for the network.
+
+        The method builds a connection matrix for the network, where each entry represents a connection between two nodes.
+        """
+        connection_matrix = np.identity(len(self.nodes))  # 创建一个对角矩阵
+        for conn in self.connections:
+            if conn.node2 is not None:
+                connection_matrix[conn.node1.identifier][conn.node2.identifier] = 1
+                connection_matrix[conn.node2.identifier][conn.node1.identifier] = 1
+        return connection_matrix
 
     def random_people_number(self):
         """Generates a list of random people number for each node.
@@ -100,11 +114,11 @@ class VentilationNetwork:
             ax.text(label_x, label_y, label, size=font_size,
                     ha='center', va='center')
 
-    def visualize_network(self):
+    def visualize_network(self, show: bool = False, save_path: str = None):
         """Visualizes the network by creating a graph representation of the nodes and connections.
 
-        The method visualizes the network by creating a graph representation of the nodes and connections
-        using matplotlib and networkx.
+        Args:
+            save_path (str, optional): The path to save the visualization. Defaults to None.
         """
         fig, ax = plt.subplots()
         outside_index = 0
@@ -112,14 +126,14 @@ class VentilationNetwork:
         G = nx.MultiDiGraph()
         for _, node in enumerate(self.nodes):
             G.add_node(
-                node.identifier, pressure=f'{node.pressure:.2f}', concentration=f'{node.concentration:.0f}')
+                node.identifier, pressure=f'{node.pressure:.2f}', concentration=f'{node.concentration:.0f}', people=f'{node.people}', size=f'{node.size}')
         for _, connection in enumerate(self.connections):
             if connection.node2 is not None:
                 G.add_edge(connection.node1.identifier,
                            connection.node2.identifier, flow=f'{connection.flow:.2f}')
             else:
                 G.add_node(f'Outside {outside_index}',
-                           pressure=connection.outside_pressure, concentration=connection.outside_concentration)
+                           pressure=connection.outside_pressure, concentration=connection.outside_concentration, people=0, size=0)
                 G.add_edge(connection.node1.identifier,
                            f'Outside {outside_index}', flow=f'{connection.flow:.2f}')
                 outside_index += 1
@@ -138,15 +152,27 @@ class VentilationNetwork:
                 u, v)], width=3, alpha=0.5, edge_color=f"C{i}", style="solid", connectionstyle=f"arc3,rad={rad}", arrowsize=20)
             edge_labels[(u, v, key, rad)] = data["flow"]
         labels = {
-            node: f"{node}\n{attrs['pressure']} Pa\n{attrs['concentration']} PPM" for node, attrs in G.nodes(data=True)}
+            node: f"Node {node}\n{attrs['pressure']} Pa\n{attrs['concentration']} PPM\n{attrs['size']} m^3" for node, attrs in G.nodes(data=True)}
         nx.draw_networkx_labels(G, pos, labels=labels, font_size=8)
         self.draw_multiedge_labels(pos, edge_labels, ax, font_size=8)
         plt.axis('off')
-        plt.show()
+        if save_path:
+            plt.savefig(f'{save_path}')
+        if show:
+            plt.show()
 
 
 if __name__ == '__main__':
+    """Main entry point of the script.
+
+    This block of code is executed if the script is run directly. It creates a VentilationNetwork,
+    and visualizes it.
+    """
     def main():
+        """Main function to run the script.
+
+        This function creates a VentilationNetwork with a seed of 1, and visualizes it.
+        """
         network = VentilationNetwork(1)
         network.visualize_network()
     main()

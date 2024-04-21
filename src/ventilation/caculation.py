@@ -32,6 +32,8 @@ class Caculation:
         self.VentilationNetwork = VentilationNetwork
         self.nodes: List[Node] = VentilationNetwork.nodes
         self.connections: List[Connection] = VentilationNetwork.connections
+        self.start_time = 0
+        self.end_time = 0
 
     def flow_equation(self, pressure_list: List[float]) -> List[float]:
         """Calculates the flow equations for the given pressure list.
@@ -66,17 +68,18 @@ class Caculation:
 
         return equations
 
-    def concentration_calculation(self, iterations: int = 1800):
+    def concentration_calculation(self, total_time: int = 1800, time_step: int = 1):
         """Calculates the concentration for each node over a number of iterations.
 
         Args:
-            iterations (int, optional): The number of iterations to perform. Defaults to 1800.
+            total_time (int, optional): The total time for the calculation. Defaults to 1800.
+            delta_time (int, optional): The time step for the calculation. Defaults to 1.
 
         Returns:
             tuple: A tuple containing the times and the concentration list.
         """
-        delta_times = 1
-        iters = iterations
+        time_step = time_step
+        iters = int(total_time / time_step)
         concentration_list = np.zeros((iters, len(self.nodes)))
         for i in range(iters):
             for j, node in enumerate(self.nodes):
@@ -93,8 +96,10 @@ class Caculation:
                             pollutant_flow -= conn.flow * \
                                 (node.concentration - conn.node2.concentration)
                 node.update_concentration(
-                    (pollutant_flow/node.size)*delta_times + node.concentration)
-        times = np.arange(0, iters, delta_times).reshape(-1, 1)
+                    (pollutant_flow/node.size)*time_step + node.concentration)
+        self.end_time += total_time
+        times = np.arange(self.start_time, self.end_time, time_step).reshape(-1, 1)
+        self.start_time += total_time
         return times, concentration_list
 
     def flow_balance(self):
