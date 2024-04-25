@@ -1,5 +1,5 @@
 import numpy as np
-from node import Node
+from .node import Node
 
 
 class Connection:
@@ -21,7 +21,7 @@ class Connection:
     """
     id_counter = 0
 
-    def __init__(self, node1: Node, node2: Node, coefficient: float, outdoor_pressure: float = None):
+    def __init__(self, node1: Node, node2: Node, coefficient: float, outside_pressure: float = None):
         """Initializes a Connection with the given nodes, coefficient, and optional outside pressure.
 
         Args:
@@ -35,7 +35,7 @@ class Connection:
         self.node1 = node1  # 连接的房间1
         self.node2 = node2  # 连接的房间2
         self.coefficient = coefficient  # 阻力系数
-        self.outside_pressure = outdoor_pressure  # 室外风压 Pa
+        self.outside_pressure = outside_pressure  # 室外风压 Pa
         self.outside_concentration = 400  # 室外浓度 ppm
         self.flow = 0  # 气流流量,正值表示从room1流向room2,负值表示从room2流向room1
 
@@ -68,6 +68,10 @@ class Connection:
         else:
             self.flow = self.calculate_flow(
                 self.node1.pressure, self.node2.pressure)
+    
+    def reset_id_counter():
+        """Resets the id_counter to 0."""
+        Connection.id_counter = 0
 
     def __repr__(self) -> str:
         """Returns a string representation of the Connection.

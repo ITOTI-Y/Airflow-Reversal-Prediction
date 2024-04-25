@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 from typing import List
-from node import Node
-from connection import Connection
-from network import VentilationNetwork
+from .node import Node
+from .connection import Connection
+from .network import VentilationNetwork
 from scipy.optimize import root
 
 

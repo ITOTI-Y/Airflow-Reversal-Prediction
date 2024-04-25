@@ -1,6 +1,6 @@
 import numpy as np
-from node import Node
-from connection import Connection
+from .node import Node
+from .connection import Connection
 import matplotlib.pyplot as plt
 import networkx as nx
 

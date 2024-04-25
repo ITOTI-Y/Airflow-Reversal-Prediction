@@ -57,6 +57,10 @@ class Node:
         """
         self.concentration = new_concentration
 
+    def reset_id_counter():
+        """Resets the id_counter to 0."""
+        Node.id_counter = 0
+
     def __repr__(self) -> str:
         """Returns a string representation of the Node.
 

@@ -1,5 +1,5 @@
-from network import VentilationNetwork
-from caculation import *
+from src.ventilation.network import VentilationNetwork
+from src.ventilation.caculation import *
 import pathlib
 
 
@@ -33,7 +33,7 @@ def main(network: VentilationNetwork, caculation: Caculation, output: bool = Fal
     if output:
         outside_node_num = sum(
             [1 for conn in network.connections if conn.node2 == None])
-        path = pathlib.Path(__file__).parents[2].joinpath('data')
+        path = pathlib.Path(__file__).parents[0].joinpath('data')
         name = f'N{len(network.nodes)}_C{len(network.connections)}_O{outside_node_num}'
         caculation.output_result(result).to_csv(
             path.joinpath(name + '.csv'), index=False)
