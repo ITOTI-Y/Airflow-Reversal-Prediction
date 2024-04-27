@@ -33,6 +33,7 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
         outside_node_num = sum(
             [1 for conn in network.connections if conn.node2 == None])
         path = pathlib.Path(__file__).parents[2].joinpath('data')
+        path.mkdir(parents=True, exist_ok=True)
         name = f'N{len(network.nodes)}_C{len(network.connections)}_O{outside_node_num}'
         caculation.output_result(result).to_csv(
             path.joinpath(name + '.csv'), index=False)
