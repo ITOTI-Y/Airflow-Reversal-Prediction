@@ -44,21 +44,34 @@ class NodeDataLoader(DataLoader):
         self.device = dataset.device
     
     def _collate_fn(self, batch):
-        feature, label, connection_matrix = zip(*batch)
-        feature = pad_sequence(feature, batch_first=True)
-        label = pad_sequence(label, batch_first=True)
-        connection_matrix = self._pad_tensors_to_max_size(connection_matrix)
-        return feature, label, connection_matrix
+        feature, label, node_matrix = zip(*batch)
+        feature = torch.cat([i for i in feature],axis=0)
+        label = torch.cat([i for i in label],axis=0)
+        node_matrix = self._combine_node_connection(node_matrix)
+        return feature, label, node_matrix
     
-    def _pad_tensors_to_max_size(self, tensor_list:list):
-        max_size = max([tensor.size(0) for tensor in tensor_list])
-        padded_tensors = []
-        for tensor in tensor_list:
-            pad_tensor = torch.zeros(max_size, max_size).to(self.device)
-            pad_tensor[:tensor.size(0), :tensor.size(1)] += tensor
-            padded_tensors.append(pad_tensor)
-        padded_tensors = torch.stack(padded_tensors)
-        return padded_tensors
+    def _combine_node_connection(self, node_matries:list | tuple):
+        matrix_size = 0
+        for i in node_matries:
+            matrix_size += i.size(0)
+        combined_matrix = torch.zeros(matrix_size, matrix_size).to(self.device)
+
+        start = 0
+        for node_matrix in node_matries:
+            end = start + node_matrix.size(0)
+            combined_matrix[start:end, start:end] += node_matrix
+            start = end
+        return combined_matrix
+    
+    # def _pad_tensors_to_max_size(self, tensor_list:list):
+    #     max_size = max([tensor.size(0) for tensor in tensor_list])
+    #     padded_tensors = []
+    #     for tensor in tensor_list:
+    #         pad_tensor = torch.zeros(max_size, max_size).to(self.device)
+    #         pad_tensor[:tensor.size(0), :tensor.size(1)] += tensor
+    #         padded_tensors.append(pad_tensor)
+    #     padded_tensors = torch.stack(padded_tensors)
+    #     return padded_tensors
 
 if __name__ == '__main__':
     dataset = NodeDataset()

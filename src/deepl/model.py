@@ -4,15 +4,20 @@ from torch_geometric.nn import GATConv
 from torch_geometric.data import Data, Batch
 from torch_geometric.nn.models import GAT
 
+def adj_to_edge_index(adj):
+    # adj is [batch, num_nodes, num_nodes]
+    # edge_index is [2, batch * num_edges]
+    edge_index = adj.nonzero(as_tuple=False).T.contiguous()
+    return edge_index
 
 class BatchGATLayer(nn.Module):
-    def __init__(self, in_dim, out_dim, num_heads, dropout=0.6):
+    def __init__(self, in_dim, d_model, num_heads, dropout=0.6):
         """
         Apply GAT to each time step of a sequence of node features
 
         Args:
             in_dim (_type_): Node feature dimension
-            out_dim (_type_): Node feature dimension
+            d_model (_type_): Node feature dimension
             num_heads (_type_): If concat == True , 
                     Multi-head attention will be achieved through stacking operations. 
                     Else average operation will be performed.
@@ -20,33 +25,15 @@ class BatchGATLayer(nn.Module):
         """
         super().__init__()
         self.gat_conv = GATConv(
-            in_dim, out_dim, heads=num_heads, concat=False, dropout=dropout)
-        
-    def _adj_to_edge_index(self,adj):
-        # adj is [batch, num_nodes, num_nodes]
-        # edge_index is [2, batch * num_edges]
-        edge_index = adj.nonzero(as_tuple=False).T[1:].contiguous()
-        return edge_index
+            in_channels=in_dim, out_channels=d_model, heads=num_heads, concat=False, dropout=dropout)
 
     def forward(self, x, node_matrix):
-        # x: Node features [batch, num_nodes, time, num_features]
-        # node_matrix: [batch, num_nodes, num_nodes]
-        edge_index = self._adj_to_edge_index(node_matrix)
-        batch_size, num_nodes, time_steps, num_features = x.size()
-        # combine batch and node dimensions
-        x = x.view(batch_size * num_nodes, time_steps, num_features)
+        # x: Node features [Multiple batch nodes, time, num_features]
+        # node_matrix: [Multiple batch nodes, Multiple batch nodes]
+        edge_index = adj_to_edge_index(node_matrix)
+        out = [self.gat_conv(x[:, i, :].float(), edge_index.long()) for i in range(x.size(1))]
+        return torch.stack(out,dim=0).transpose(1,0)
 
-        # apply GAT to each time step
-        gat_out = []
-        for t in range(time_steps):
-            # out: [batch*num_nodes, num_features*num_heads]
-            x_t = x[:, t, :]
-            out = self.gat_conv(x_t.float(), edge_index.long())
-            gat_out.append(out.unsqueeze(1))
-
-        # output [batch, num_nodes, time, num_features*num_heads]
-        return torch.cat(gat_out, dim=1).view(batch_size, num_nodes, time_steps, -1)
-    
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model:int, dropout=0.6, max_time:int=1800):
         super().__init__()
@@ -64,27 +51,6 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :, :x.size(2)]
         return self.dropout(x)
 
-class GAT_Module(nn.Module):
-    def __init__(self, in_dim, d_model, num_layers, dropout=0.6):
-        super().__init__()
-        self.gat = GAT(in_channels = in_dim, hidden_channels=d_model, num_layers=num_layers, dropout=dropout)
-
-    def _adj_to_edge_index(self,adj):
-        # adj is [1, num_nodes, num_nodes]
-        # edge_index is [2, num_edges]
-        edge_index = adj.nonzero(as_tuple=False).T[1:].contiguous()
-        return edge_index
-    
-    def _forward(self, x, node_matrix):
-        edge_index = self._adj_to_edge_index(node_matrix)
-        return self.gat(x.float(), edge_index.long())
-
-    def forward(self, x, node_matrix):
-        # x: Node features [batch, num_nodes, time, num_features]
-        out = []
-        for t in range(x.size(2)):
-            out.append(self._forward(x[0, :, t, :], node_matrix))
-        return self.gat(x)
 
 class Temporal_Transformer(nn.Module):
     def __init__(self, d_model, nhead, num_encoder_layers, num_decoder_layers, dim_feedforward, dropout=0.6, **kwargs):
@@ -101,27 +67,19 @@ class Temporal_Transformer(nn.Module):
         out = self.transformer(src, tgt)
         return out.view(batch_size, num_nodes, -1, num_features)
     
-class Full_Connected(nn.Module):
-    def __init__(self, in_dim, out_dim):
-        super().__init__()
-        self.fc = nn.Linear(in_dim, out_dim)
-    
-    def forward(self, x):
-        return self.fc(x)
 
 class Temporal_GAT_Transformer(nn.Module):
     def __init__(self, in_dim, d_model, num_heads, num_layers, dropout=0.6):
         super().__init__()
-        # input: [batch, num_nodes, time, num_features]
+        # input: [Multiple batch nodes, time, num_features]
         # self.gat = BatchGATLayer(in_dim, d_model, num_heads, dropout)
-        self.gat = GAT_Module(in_dim, d_model, num_layers, dropout)
-        # input: [batch, num_nodes, time, num_features]
+        self.gat = BatchGATLayer(in_dim, d_model, num_layers, dropout)
+        # input: [Multiple batch nodes, time, num_features]
         self.positon_encoding = PositionalEncoding(d_model)
         # input: [batch, num_nodes, time, num_features]
         self.transformer = Temporal_Transformer(d_model=d_model, nhead=num_heads, num_encoder_layers=num_layers,
                                                 num_decoder_layers=num_layers, dim_feedforward=16, dropout=dropout, batch_first=True)
         # input: [batch, num_nodes, time, num_features]
-        self.fc = Full_Connected(d_model, 1)
 
     def forward(self, x, node_matrix):
         x = self.gat(x, node_matrix)
