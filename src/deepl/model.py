@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import GATConv
 from torch_geometric.data import Data, Batch
+from torch_geometric.nn.models import GAT
 
 
 class BatchGATLayer(nn.Module):
@@ -63,41 +64,27 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :, :x.size(2)]
         return self.dropout(x)
 
+class GAT_Module(nn.Module):
+    def __init__(self, in_dim, d_model, num_layers, dropout=0.6):
+        super().__init__()
+        self.gat = GAT(in_channels = in_dim, hidden_channels=d_model, num_layers=num_layers, dropout=dropout)
 
-# class Temporal_Encoder_Layer(nn.Module):
-#     def __init__(self, in_dim, num_heads, num_layers, dropout=0.6):
-#         super().__init__()
-#         self.encoder_layer = nn.TransformerEncoderLayer(
-#             d_model=in_dim, nhead=num_heads, dropout=dropout)
-#         self.transformer_encoder = nn.TransformerEncoder(
-#             self.encoder_layer, num_layers=num_layers)
+    def _adj_to_edge_index(self,adj):
+        # adj is [1, num_nodes, num_nodes]
+        # edge_index is [2, num_edges]
+        edge_index = adj.nonzero(as_tuple=False).T[1:].contiguous()
+        return edge_index
+    
+    def _forward(self, x, node_matrix):
+        edge_index = self._adj_to_edge_index(node_matrix)
+        return self.gat(x.float(), edge_index.long())
 
-#     def forward(self, x):
-#         # x: [batch, num_nodes, time, num_features]
-#         # combine batch and node dimensions for transformer
-#         batch_size, num_nodes, time_steps, num_features = x.size()
-#         x = x.view(batch_size, num_nodes*time_steps, num_features)
-#         x = self.transformer_encoder(x)
-#         return x.view(batch_size, num_nodes, time_steps, num_features)
-
-
-# class Temporal_Decoder_Layer(nn.Module):
-#     def __init__(self, in_dim, num_heads, num_layers, dropout=0.6):
-#         super().__init__()
-#         self.decoder_layer = nn.TransformerDecoderLayer(
-#             d_model=in_dim, nhead=num_heads, dropout=dropout)
-#         self.transformer_decoder = nn.TransformerDecoder(
-#             self.decoder_layer, num_layers=num_layers)
-
-#     def forward(self, x):
-#         # x: [batch, num_nodes, time, num_features]
-#         # combine batch and node dimensions for transformer
-#         batch_size, num_nodes, time_steps, num_features = x.size()
-#         tgt = x[:, :, -1, :]
-#         x = x.view(batch_size, num_nodes*time_steps, num_features)
-#         out = self.transformer_decoder(tgt=tgt, memory=x)
-#         return out.view(batch_size, num_nodes, time_steps, num_features)
-
+    def forward(self, x, node_matrix):
+        # x: Node features [batch, num_nodes, time, num_features]
+        out = []
+        for t in range(x.size(2)):
+            out.append(self._forward(x[0, :, t, :], node_matrix))
+        return self.gat(x)
 
 class Temporal_Transformer(nn.Module):
     def __init__(self, d_model, nhead, num_encoder_layers, num_decoder_layers, dim_feedforward, dropout=0.6, **kwargs):
@@ -126,7 +113,8 @@ class Temporal_GAT_Transformer(nn.Module):
     def __init__(self, in_dim, d_model, num_heads, num_layers, dropout=0.6):
         super().__init__()
         # input: [batch, num_nodes, time, num_features]
-        self.gat = BatchGATLayer(in_dim, d_model, num_heads, dropout)
+        # self.gat = BatchGATLayer(in_dim, d_model, num_heads, dropout)
+        self.gat = GAT_Module(in_dim, d_model, num_layers, dropout)
         # input: [batch, num_nodes, time, num_features]
         self.positon_encoding = PositionalEncoding(d_model)
         # input: [batch, num_nodes, time, num_features]
