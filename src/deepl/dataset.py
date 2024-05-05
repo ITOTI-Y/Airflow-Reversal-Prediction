@@ -62,16 +62,6 @@ class NodeDataLoader(DataLoader):
             combined_matrix[start:end, start:end] += node_matrix
             start = end
         return combined_matrix
-    
-    # def _pad_tensors_to_max_size(self, tensor_list:list):
-    #     max_size = max([tensor.size(0) for tensor in tensor_list])
-    #     padded_tensors = []
-    #     for tensor in tensor_list:
-    #         pad_tensor = torch.zeros(max_size, max_size).to(self.device)
-    #         pad_tensor[:tensor.size(0), :tensor.size(1)] += tensor
-    #         padded_tensors.append(pad_tensor)
-    #     padded_tensors = torch.stack(padded_tensors)
-    #     return padded_tensors
 
 if __name__ == '__main__':
     dataset = NodeDataset()

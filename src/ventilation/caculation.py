@@ -152,7 +152,7 @@ def main(network: VentilationNetwork, caculation: Caculation, seed: int = 0, out
     """
     caculation.flow_balance()
     result = {f'Node {node.identifier}': {'time': [], 'pressure': [],
-                                          'concentration': [], 'people': []} for node in caculation.nodes}
+                                          'concentration': [], 'people': [], 'size': []} for node in caculation.nodes}
     for _ in range(3):
         times, concentration_list = caculation.concentration_calculation()
         for i, node in enumerate(caculation.nodes):
@@ -163,6 +163,8 @@ def main(network: VentilationNetwork, caculation: Caculation, seed: int = 0, out
                 (np.ones_like(concentration_list[:, i])*node.people).astype(int))
             result[f'Node {node.identifier}']['pressure'].extend(
                 [node.pressure]*len(concentration_list[:, i]))
+            result[f'Node {node.identifier}']['size'].extend(
+                [node.size]*len(concentration_list[:, i]))
             network.random_people_number()
     if output:
         df = caculation.output_result(result)

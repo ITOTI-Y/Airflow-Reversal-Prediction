@@ -30,20 +30,23 @@ def prep_non_matrix_data(file_path: str) -> tuple:
             - values (ndarray): An array of shape (num_nodes, num_times-1, 2) containing the concentration and people values.
             - labels (ndarray): An array of shape (num_nodes, 1) containing the concentration labels.
     """
+    TIME = 1
     data = pd.read_csv(file_path).loc[:, [
-        'Node', 'time', 'concentration', 'people']]
+        'Node', 'time', 'concentration', 'people', 'size']]
     data.replace('Node ', '', inplace=True, regex=True)
     times = data['time'].unique()
     nodes = data['Node'].unique()
-    values = np.zeros((len(nodes), len(times)-1, 2))
+    values = np.zeros((len(nodes), len(times)-TIME, 3))
     labels = np.zeros((len(nodes), 1))
     for i, node in enumerate(nodes):
         node_data = data[data['Node'] == node]
         concentration = node_data['concentration'].values
         people = node_data['people'].values
-        values[i, :, 0] = concentration[:-1]
-        values[i, :, 1] = people[:-1]
-        labels[i] = concentration[-1]
+        size = node_data['size'].values
+        values[i, :, 0] = concentration[:-TIME]
+        values[i, :, 1] = people[:-TIME]
+        values[i, :, 2] = size[:-TIME]
+        labels[i] = concentration[-TIME]
     building_identifier = file_path.stem
     return building_identifier, values, labels
 

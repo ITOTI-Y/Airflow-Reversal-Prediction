@@ -12,6 +12,18 @@ def adj_to_edge_index(adj):
     return edge_index
 
 
+def edge_index_to_adj(x, edge_index):
+    # edge_index is [2, batch * num_edges]
+    # x is [Multiple batch nodes, times, nodes_features]
+    # adj is [num_nodes, num_nodes, nodes_features]
+    adj = torch.zeros((edge_index.max().item()+1,
+                      edge_index.max().item()+1, x.size(2)))
+    for i in range(edge_index.size(1)):
+        adj[edge_index[0, i], edge_index[1, i]] = x[i]
+    adj = torch.mean(adj, dim=2)
+    return adj
+
+
 class BatchGATLayer(nn.Module):
     def __init__(self, in_dim, d_model, num_heads, dropout=0.6):
         """
@@ -78,6 +90,42 @@ class Temporal_Transformer(nn.Module):
         return out
 
 
+class PINNLayer(nn.Module):
+    def __init__(self, in_dim, out_dim, size):
+        super().__init__()
+        self.conv = nn.Conv2d(in_dim, out_dim, size)
+        pass
+
+    def _people_exhaled(self, people, size):
+        HUMAN_EXHALATION = 0.0001  # 人体潮气量 m^3/s
+        HUMAN_EXHALATION_CONCENTRATION = 40000  # 人体潮气二氧化碳浓度 ppm
+        HUMAN_EXHALATION_FLOW = HUMAN_EXHALATION * \
+            HUMAN_EXHALATION_CONCENTRATION  # 人体潮气二氧化碳流量 ppm*m^3/s
+        for i, value in enumerate(people):
+            people[i] = HUMAN_EXHALATION_FLOW * value.item()/size[i].item()
+        return people
+
+    def forward(self, origin_data, x, edge_index):
+        node_list = torch.zeros_like(edge_index.unique(), dtype=torch.float32)
+        concentration = origin_data[:, -1, 0]
+        size = origin_data[:, -1, 2]
+        people = origin_data[:, -1, 1]
+        x = x.unsqueeze(0)
+        x = x.permute(0, 3, 1, 2)
+        # x = x.permute()
+        x = self.conv(x)
+        x = x.permute(0, 2, 3, 1).squeeze(0)
+        flow = x.clone()
+        for i, (conn, value) in enumerate(zip(edge_index.T, x)):
+            if conn[0] != conn[1]:
+                node_list[conn[0]] -= value.item()*concentration[conn[0]
+                                                                 ].item()/size[conn[0]].item()
+                node_list[conn[1]] += value.item()*concentration[conn[0]
+                                                                 ].item()/size[conn[1]].item()
+        result = concentration + node_list + self._people_exhaled(people, size)
+        return result.unsqueeze(1), flow
+
+
 class Temporal_GAT_Transformer(nn.Module):
     def __init__(self, in_dim, d_model, num_heads, num_layers, dropout=0.6):
         super().__init__()
@@ -90,12 +138,16 @@ class Temporal_GAT_Transformer(nn.Module):
         self.transformer = Temporal_Transformer(d_model=d_model, nhead=num_heads, num_encoder_layers=num_layers,
                                                 num_decoder_layers=num_layers, dim_feedforward=16, dropout=dropout, batch_first=True)
         # input: [Multiple batch nodes, time, num_features]
-        self.output = BatchGATLayer(d_model, 1, 1, dropout)
+        self.weights = BatchGATLayer(d_model, 1, d_model, dropout)
         # input: [Edge_index, time, num_features]
+        self.pinn = PINNLayer(d_model, 1, 1)
 
-    def forward(self, x, node_matrix):
-        x = self.gat(x, node_matrix)
+    def forward(self, origin_data, node_matrix):
+        x = self.gat(origin_data, node_matrix)
         x = self.positon_encoding(x)
         x = self.transformer(x)
-        x, edge_index = self.output(x, node_matrix, weights=True)  # 这里得到的应该是流量信息
-        return x
+        x, edge_index = self.weights(
+            x, node_matrix, weights=True)  # 这里得到的应该是流量信息
+        # x = edge_index_to_adj(x, edge_index)
+        x, flow = self.pinn(origin_data, x, edge_index)
+        return x, flow
