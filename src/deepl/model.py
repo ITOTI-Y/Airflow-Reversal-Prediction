@@ -106,7 +106,7 @@ class PINNLayer(nn.Module):
         return people
 
     def forward(self, origin_data, x, edge_index):
-        node_list = torch.zeros_like(edge_index.unique(), dtype=torch.float32)
+        node_list = torch.zeros_like(edge_index.unique(),device=x.device, dtype=torch.float32, requires_grad=True)
         concentration = origin_data[:, -1, 0]
         size = origin_data[:, -1, 2]
         people = origin_data[:, -1, 1]
@@ -116,13 +116,14 @@ class PINNLayer(nn.Module):
         x = self.conv(x)
         x = x.permute(0, 2, 3, 1).squeeze(0)
         flow = x.clone()
+        node_list_new = node_list.clone() # 避免破坏计算图
         for i, (conn, value) in enumerate(zip(edge_index.T, x)):
             if conn[0] != conn[1]:
-                node_list[conn[0]] -= value.item()*concentration[conn[0]
+                node_list_new[conn[0]] = value.item()*concentration[conn[0]
                                                                  ].item()/size[conn[0]].item()
-                node_list[conn[1]] += value.item()*concentration[conn[0]
+                node_list_new[conn[1]] = value.item()*concentration[conn[0]
                                                                  ].item()/size[conn[1]].item()
-        result = concentration + node_list + self._people_exhaled(people, size)
+        result = concentration + node_list_new + self._people_exhaled(people, size)
         return result.unsqueeze(1), flow
 
 
