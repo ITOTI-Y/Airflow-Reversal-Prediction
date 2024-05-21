@@ -142,13 +142,16 @@ class Temporal_GAT_Transformer(nn.Module):
         self.weights = BatchGATLayer(d_model, 1, d_model, dropout)
         # input: [Edge_index, time, num_features]
         self.pinn = PINNLayer(d_model, 1, 1)
+        # output: 
+        # x: [Multiple batch nodes, num_features]
+        # flow: [Edge_index, num_features]
 
     def forward(self, origin_data, node_matrix):
         x = self.gat(origin_data, node_matrix)
         x = self.positon_encoding(x)
         x = self.transformer(x)
         x, edge_index = self.weights(
-            x, node_matrix, weights=True)  # 这里得到的应该是流量信息
+            x, node_matrix, weights=True) # GAT attention weights get flow information
         # x = edge_index_to_adj(x, edge_index)
         x, flow = self.pinn(origin_data, x, edge_index)
-        return x, flow
+        return x, flow[:,:,0]

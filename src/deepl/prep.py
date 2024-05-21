@@ -50,6 +50,24 @@ def prep_non_matrix_data(file_path: str) -> tuple:
     building_identifier = file_path.stem
     return building_identifier, values, labels
 
+def prep_flow_data(file_path: str) -> tuple:
+    """
+    Preprocesses flow data from a CSV file.
+
+    Args:
+        file_path (str): The path to the CSV file.
+
+    Returns:
+        tuple: A tuple containing the building identifier and values.
+            - building_identifier (str): The identifier of the building.
+            - values (ndarray): An array of shape (edge_index, 1) containing the connections and flow value.
+    """
+    data = pd.read_csv(file_path).sort_values(by=['Node1', 'Node2'])
+    data['pair'] = data.apply(lambda row: tuple(sorted((row['Node1'],row['Node2']))), axis=1)
+    pass
+    building_identifier = file_path.stem.replace("_flow", "")
+    return building_identifier, data
+
 
 def prep_data(file_path: str) -> tuple:
     """
@@ -63,5 +81,7 @@ def prep_data(file_path: str) -> tuple:
     """
     if "_matrix" in file_path.name:
         return prep_matrix_data(file_path)
+    elif "_flow" in file_path.name:
+        return prep_flow_data(file_path)
     else:
         return prep_non_matrix_data(file_path)

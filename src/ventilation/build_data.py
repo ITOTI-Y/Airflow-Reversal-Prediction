@@ -2,7 +2,7 @@ from .network import VentilationNetwork
 from .caculation import *
 import pathlib
 
-def step_data(network: VentilationNetwork, caculation: Caculation, output: bool = False):
+def step_data(network: VentilationNetwork, caculation: Caculation, output: bool = False, show=False):
     """Main function to run the calculation.
 
     This function runs the flow balance calculation, performs concentration calculations,
@@ -15,6 +15,8 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
 
     """
     caculation.flow_balance()
+    if show:
+        network.visualize_network(show=True)
     result = {f'Node {node.identifier}': {'time': [], 'pressure': [],
                                           'concentration': [], 'people': [], 'size':[]} for node in caculation.nodes}
     for _ in range(3):
@@ -37,19 +39,22 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
         path = pathlib.Path(__file__).parents[2].joinpath('data')
         path.mkdir(parents=True, exist_ok=True)
         name = f'N{len(network.nodes)}_C{len(network.connections)}_O{outside_node_num}'
+        flow = [[conn.node1.identifier,conn.node2.identifier,conn.flow] for conn in network.connections if conn.node2 is not None]
+        pd.DataFrame(flow, columns=['Node1', 'Node2', 'Flow']).to_csv(
+            path.joinpath(name + '_flow.csv'), index=False)
         caculation.output_result(result).to_csv(
             path.joinpath(name + '.csv'), index=False)
         pd.DataFrame(network.connection_matrix).to_csv(
             path.joinpath(name + '_matrix.csv'), index=False)
         
-def multi_step_data(step:int = 10, output: bool = False):
+def multi_step_data(step:int = 10, output: bool = False, show=False):
     for _ in range(step):
         try:
             Node.id_counter = 0
             Connection.id_counter = 0
             network = VentilationNetwork()
             caculation = Caculation(network)
-            step_data(network, caculation, output=output)
+            step_data(network, caculation, output=output, show=show)
         except:
             print('Error')
             continue

@@ -12,30 +12,34 @@ class NodeDataset(Dataset):
         else:
             self.data_path = pathlib.Path(__file__).parents[2].joinpath('data')
         self.device = device
-        self.feature, self.labels, self.connection_matrices = self._build_dataset()
+        self.feature, self.labels, self.connection_matrices, self.flow = self._build_dataset()
         self.keys = list(self.feature.keys())
         pass
 
     def _build_dataset(self):
         feature = {}
         labels = {}
-        connection_matrices = {}
+        flow = {}
+        node_matrix = {}
         for file_path in self.data_path.glob('*.csv'):
             if "_matrix" in file_path.name:
                 building_identifier,values = prep_data(file_path)
-                connection_matrices[building_identifier] = torch.from_numpy(values).to(self.device)
+                node_matrix[building_identifier] = torch.from_numpy(values).to(self.device)
+            elif "_flow" in file_path.name:
+                building_identifier, values = prep_data(file_path)
+                flow[building_identifier] = torch.from_numpy(values).to(self.device)
             else:
                 building_identifier, values, label = prep_data(file_path)
                 feature[building_identifier] = torch.from_numpy(values).to(self.device)
                 labels[building_identifier] = torch.from_numpy(label).to(self.device)
-        return feature, labels, connection_matrices
+        return feature, labels, node_matrix, flow
     
     def __len__(self):
         return len(self.feature)
     
     def __getitem__(self, idx):
         key = self.keys[idx]
-        return self.feature[key], self.labels[key], self.connection_matrices[key]
+        return self.feature[key], self.labels[key], self.connection_matrices[key], self.flow[key]
     
 class NodeDataLoader(DataLoader):
     def __init__(self, dataset, *args, **kwargs):
@@ -44,10 +48,11 @@ class NodeDataLoader(DataLoader):
         self.device = dataset.device
     
     def _collate_fn(self, batch):
-        feature, label, node_matrix = zip(*batch)
+        feature, label, node_matrix, flow = zip(*batch)
         feature = torch.cat([i for i in feature],axis=0)
         label = torch.cat([i for i in label],axis=0)
         node_matrix = self._combine_node_connection(node_matrix)
+        flow = self._combine_flow(flow)
         return feature, label, node_matrix
     
     def _combine_node_connection(self, node_matries:list | tuple):
@@ -62,6 +67,18 @@ class NodeDataLoader(DataLoader):
             combined_matrix[start:end, start:end] += node_matrix
             start = end
         return combined_matrix
+    
+    def _combine_flow(self, flow:list | tuple):
+        index = 0
+        start = 0
+        combine_flow = torch.zeros_like(torch.cat([i for i in flow],axis=0))
+        for f in flow:
+            f[:,:-1] += index
+            end = start + f.size(0)
+            index += f[:,:-1].max().item() + 1
+            combine_flow[start:end] += f
+            start = end
+        pass
 
 if __name__ == '__main__':
     dataset = NodeDataset()
