@@ -16,7 +16,7 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
     """
     caculation.flow_balance()
     if show:
-        network.visualize_network(show=True)
+        network.visualize_network(show=show)
     result = {f'Node {node.identifier}': {'time': [], 'pressure': [],
                                           'concentration': [], 'people': [], 'size':[]} for node in caculation.nodes}
     for _ in range(3):

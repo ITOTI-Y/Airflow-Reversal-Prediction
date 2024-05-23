@@ -27,7 +27,7 @@ class NodeDataset(Dataset):
                 node_matrix[building_identifier] = torch.from_numpy(values).to(self.device)
             elif "_flow" in file_path.name:
                 building_identifier, values = prep_data(file_path)
-                flow[building_identifier] = torch.from_numpy(values).to(self.device)
+                flow[building_identifier] = None
             else:
                 building_identifier, values, label = prep_data(file_path)
                 feature[building_identifier] = torch.from_numpy(values).to(self.device)
@@ -52,7 +52,7 @@ class NodeDataLoader(DataLoader):
         feature = torch.cat([i for i in feature],axis=0)
         label = torch.cat([i for i in label],axis=0)
         node_matrix = self._combine_node_connection(node_matrix)
-        flow = self._combine_flow(flow)
+        # flow = self._combine_flow(flow)
         return feature, label, node_matrix
     
     def _combine_node_connection(self, node_matries:list | tuple):

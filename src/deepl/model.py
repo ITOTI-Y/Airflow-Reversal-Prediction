@@ -46,6 +46,7 @@ class BatchGATLayer(nn.Module):
         # node_matrix: [Multiple batch nodes, Multiple batch nodes]
         edge_index = adj_to_edge_index(node_matrix)
         if weights:
+            # out: [edge_index, time, num_features]
             out = [self.gat_conv(x[:, i, :].float(), edge_index.long(
             ), return_attention_weights=weights)[1][1] for i in range(x.size(1))]
             return torch.stack(out, dim=1), edge_index
@@ -106,18 +107,23 @@ class PINNLayer(nn.Module):
         return people
 
     def forward(self, origin_data, x, edge_index):
+        # origin_data: [Multiple batch nodes, time, num_features]
+        # x: [edge_index, time, num_features]
+        # edge_index: [2, edge_index]
+        # result: [Multiple batch nodes, num_features]
         node_list = torch.zeros_like(edge_index.unique(),device=x.device, dtype=torch.float32, requires_grad=True)
         concentration = origin_data[:, -1, 0]
         size = origin_data[:, -1, 2]
         people = origin_data[:, -1, 1]
         x = x.unsqueeze(0)
         x = x.permute(0, 3, 1, 2)
-        # x = x.permute()
-        x = self.conv(x)
+        # x: [1, num_features, edge_index, time]
+        x = self.conv(x) # Conv features with 1x1 kernel
         x = x.permute(0, 2, 3, 1).squeeze(0)
+        # x: [1, edge_index, time, num_features]
         flow = x.clone()
         node_list_new = node_list.clone() # 避免破坏计算图
-        for i, (conn, value) in enumerate(zip(edge_index.T, x)):
+        for _, (conn, value) in enumerate(zip(edge_index.T, x)):
             if conn[0] != conn[1]:
                 node_list_new[conn[0]] = value.item()*concentration[conn[0]
                                                                  ].item()/size[conn[0]].item()
@@ -128,13 +134,12 @@ class PINNLayer(nn.Module):
 
 
 class Temporal_GAT_Transformer(nn.Module):
-    def __init__(self, in_dim, d_model, num_heads, num_layers, dropout=0.6):
+    def __init__(self, in_dim, d_model, num_heads, num_layers, dropout=0.1):
         super().__init__()
         # input: [Multiple batch nodes, time, num_features]
-        # self.gat = BatchGATLayer(in_dim, d_model, num_heads, dropout)
         self.gat = BatchGATLayer(in_dim, d_model, num_layers, dropout)
         # input: [Multiple batch nodes, time, num_features]
-        self.positon_encoding = PositionalEncoding(d_model)
+        self.positon_encoding = PositionalEncoding(d_model = d_model, dropout=dropout)
         # input: [Multiple batch nodes, time, num_features]
         self.transformer = Temporal_Transformer(d_model=d_model, nhead=num_heads, num_encoder_layers=num_layers,
                                                 num_decoder_layers=num_layers, dim_feedforward=16, dropout=dropout, batch_first=True)
@@ -144,7 +149,7 @@ class Temporal_GAT_Transformer(nn.Module):
         self.pinn = PINNLayer(d_model, 1, 1)
         # output: 
         # x: [Multiple batch nodes, num_features]
-        # flow: [Edge_index, num_features]
+        # flow: [Node1, Node2, num_features]
 
     def forward(self, origin_data, node_matrix):
         x = self.gat(origin_data, node_matrix)
@@ -152,6 +157,5 @@ class Temporal_GAT_Transformer(nn.Module):
         x = self.transformer(x)
         x, edge_index = self.weights(
             x, node_matrix, weights=True) # GAT attention weights get flow information
-        # x = edge_index_to_adj(x, edge_index)
         x, flow = self.pinn(origin_data, x, edge_index)
-        return x, flow[:,:,0]
+        return x, torch.cat([edge_index.T,flow[:,:,0]],axis=1)
