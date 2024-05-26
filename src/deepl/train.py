@@ -4,6 +4,7 @@ from tqdm import tqdm
 from .dataset import NodeDataset, NodeDataLoader
 from .model import *
 from .loss import *
+from ..utils.flow import *
 
 class Train():
     def __init__(self, data_path:str=None):
@@ -25,6 +26,7 @@ class Train():
             label = label.to(self.device)
             connection_matrix = connection_matrix.to(self.device)
             out, flow = model(feature, connection_matrix)
+            flow = compute_net_flow(flow)
             loss_value = loss(out, label)
             loss_value.backward()
             optimizer.step()
