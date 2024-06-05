@@ -1,8 +1,18 @@
 import torch
 
-def compute_net_flow(flows: torch.Tensor):
-    flow_dict = {}
+def compute_net_flow(flows: torch.Tensor) -> torch.Tensor:
+    """
+    Compute the net flow of the flows.
 
+    Args:
+        flows (torch.Tensor): the flows to compute the net flow
+
+    Returns:
+        torch.Tensor: output's device is the same as the input's device
+    """
+    flow_dict = {}
+    if not isinstance(flows, torch.Tensor):
+        flows = torch.tensor(flows)
     for flow in flows:
         node1, node2, value = flow[0].item(), flow[1].item(), flow[2].item()
         if node1 == node2:

@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 
-
 def prep_matrix_data(file_path: str) -> tuple:
     """
     Prepares matrix data for training.
@@ -63,10 +62,13 @@ def prep_flow_data(file_path: str) -> tuple:
             - values (ndarray): An array of shape (edge_index, 1) containing the connections and flow value.
     """
     data = pd.read_csv(file_path).sort_values(by=['Node1', 'Node2'])
-    data['pair'] = data.apply(lambda row: tuple(sorted((row['Node1'],row['Node2']))), axis=1)
-    pass
+    mask = data['Node1'] > data['Node2']
+    data.loc[mask, ['Node1', 'Node2']] = data.loc[mask, ['Node2', 'Node1']].values
+    data.loc[mask, 'Flow'] = -data.loc[mask, 'Flow']
+    data = data.sort_values(by=['Node1', 'Node2'])
+    data = data.reset_index(drop=True)
     building_identifier = file_path.stem.replace("_flow", "")
-    return building_identifier, data
+    return building_identifier, data.to_numpy()
 
 
 def prep_data(file_path: str) -> tuple:

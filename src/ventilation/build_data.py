@@ -2,6 +2,9 @@ from .network import VentilationNetwork
 from .caculation import *
 import pathlib
 
+TOTAL_TIME = 200
+TIME_STEP = 5
+
 def step_data(network: VentilationNetwork, caculation: Caculation, output: bool = False, show=False):
     """Main function to run the calculation.
 
@@ -15,13 +18,11 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
 
     """
     caculation.flow_balance()
-    if show:
-        network.visualize_network(show=show)
     result = {f'Node {node.identifier}': {'time': [], 'pressure': [],
                                           'concentration': [], 'people': [], 'size':[]} for node in caculation.nodes}
     for _ in range(3):
         times, concentration_list = caculation.concentration_calculation(
-            total_time=200, time_step=5)
+            total_time=TOTAL_TIME, time_step=TIME_STEP)
         for i, node in enumerate(caculation.nodes):
             result[f'Node {node.identifier}']['time'].extend(times[:, 0])
             result[f'Node {node.identifier}']['concentration'].extend(
@@ -46,7 +47,12 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
             path.joinpath(name + '.csv'), index=False)
         pd.DataFrame(network.connection_matrix).to_csv(
             path.joinpath(name + '_matrix.csv'), index=False)
-        
+        if show:
+            network.visualize_network(save_path=path.joinpath(name + '.jpg'))
+    elif not output:
+        if show:
+            network.visualize_network(show=show)
+
 def multi_step_data(step:int = 10, output: bool = False, show=False):
     for _ in range(step):
         try:
