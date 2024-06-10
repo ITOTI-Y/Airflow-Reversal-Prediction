@@ -4,9 +4,10 @@ from typing import List
 from .node import Node
 from .connection import Connection
 from .network import VentilationNetwork
+from .config import CALCULATE_CONFIG
 from scipy.optimize import root
 
-
+ENV_CONFIG = CALCULATE_CONFIG()
 class Caculation:
     """A class used to perform calculations on a VentilationNetwork.
 
@@ -18,10 +19,6 @@ class Caculation:
         nodes (List[Node]): The list of nodes in the VentilationNetwork.
         connections (List[Connection]): The list of connections in the VentilationNetwork.
     """
-    HUMAN_EXHALATION = 0.0001  # 人体潮气量 m^3/s
-    HUMAN_EXHALATION_CONCENTRATION = 40000  # 人体潮气二氧化碳浓度 ppm
-    HUMAN_EXHALATION_FLOW = HUMAN_EXHALATION * \
-        HUMAN_EXHALATION_CONCENTRATION  # 人体潮气二氧化碳流量 ppm*m^3/s
 
     def __init__(self, VentilationNetwork: VentilationNetwork):
         """Initializes an instance of the Calculation class.
@@ -84,7 +81,7 @@ class Caculation:
         for i in range(iters):
             for j, node in enumerate(self.nodes):
                 concentration_list[i][j] = node.concentration
-                pollutant_flow = node.people * self.HUMAN_EXHALATION_FLOW
+                pollutant_flow = node.people * ENV_CONFIG.HUMAN_EXHALATION_FLOW
                 for conn in self.connections:
                     if conn.node1 == node:
                         if conn.flow <= 0:
@@ -100,7 +97,8 @@ class Caculation:
         self.end_time += total_time
         times = np.arange(self.start_time, self.end_time, time_step).reshape(-1, 1)
         self.start_time += total_time
-        return times, concentration_list
+        outside_concentarion_list = np.ones_like(times) * ENV_CONFIG.OUTSIDE_CONCENTRATION
+        return times, np.concatenate([concentration_list,outside_concentarion_list],axis=1)
 
     def flow_balance(self):
         """Balances the flow in the ventilation network by solving a non-linear equation system.

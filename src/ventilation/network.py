@@ -1,9 +1,11 @@
 import numpy as np
 from .node import Node
 from .connection import Connection
+from .config import CALCULATE_CONFIG
 import matplotlib.pyplot as plt
 import networkx as nx
 
+ENV_CONFIG = CALCULATE_CONFIG()
 
 class VentilationNetwork:
     """A class used to represent a Ventilation Network.
@@ -40,30 +42,30 @@ class VentilationNetwork:
         and connecting them with random coefficients. It also assigns random outside
         pressures to some connections.
         """
-        node_num = np.random.randint(4, 12)
-        connection_num = (np.random.uniform(1.5, 2) * node_num) // 1
-        outside_pressure = np.random.randint(1, 10, np.random.randint(2, 5))
+        node_num = np.random.randint(*ENV_CONFIG.NODE_NUM_RANGE)
+        connection_num = (np.random.uniform(*ENV_CONFIG.CONNECTION_NUM_TIMES) * node_num) // 1
+        outside_pressure = np.random.randint(*ENV_CONFIG.OUTSIDE_PRESSURE_RANGE, np.random.randint(*ENV_CONFIG.OUTSIDE_NODE_NUM))
         for _ in range(node_num):
             self.nodes.append(Node(size=np.random.randint(
-                25, 60), people=np.random.randint(1, 10)))
+                *ENV_CONFIG.NODE_SIZE_RANGE), people=np.random.randint(*ENV_CONFIG.NODE_PEOPLE_RANGE)))
 
         # chosen_nodes = np.random.choice(self.nodes,np.random.randint(2,5),replace=False)
         for i in range(node_num):
             if i == 0:
                 last_node = i
             else:
-                coefficient = round(np.random.uniform(0.2, 0.8), 1)
+                coefficient = round(np.random.uniform(*ENV_CONFIG.COEFFICIENT_RANGE), 1)
                 self.connections.append(Connection(
                     self.nodes[last_node], self.nodes[i], coefficient))
                 last_node = i
                 connection_num -= 1
         if connection_num != 0:
             for i in range(int(connection_num)):
-                coefficient = round(np.random.uniform(0.2, 0.8), 1)
+                coefficient = round(np.random.uniform(*ENV_CONFIG.COEFFICIENT_RANGE), 1)
                 node1, node2 = np.random.choice(self.nodes, 2, replace=False)
                 self.connections.append(Connection(node1, node2, coefficient))
         for i in range(outside_pressure.size):
-            coefficient = round(np.random.uniform(0.2, 0.8), 1)
+            coefficient = round(np.random.uniform(*ENV_CONFIG.COEFFICIENT_RANGE), 1)
             self.connections.append(Connection(np.random.choice(
                 self.nodes), None, coefficient, outside_pressure[i]))
 
@@ -72,11 +74,14 @@ class VentilationNetwork:
 
         The method builds a connection matrix for the network, where each entry represents a connection between two nodes.
         """
-        connection_matrix = np.identity(len(self.nodes))  # 创建一个对角矩阵
+        connection_matrix = np.identity(len(self.nodes)+1)  # create a diagonal matrix contaning outdoor nodes
         for conn in self.connections:
             if conn.node2 is not None:
                 connection_matrix[conn.node1.identifier][conn.node2.identifier] = 1
                 connection_matrix[conn.node2.identifier][conn.node1.identifier] = 1
+            else:
+                connection_matrix[conn.node1.identifier][-1] = 1
+                connection_matrix[-1][conn.node1.identifier] = 1
         return connection_matrix
 
     def random_people_number(self):

@@ -52,21 +52,34 @@ class NodeDataLoader(DataLoader):
         feature = torch.cat([i for i in feature],axis=0)
         label = torch.cat([i for i in label],axis=0)
         node_matrix = self._combine_node_connection(node_matrix)
-        return feature, label, node_matrix
+        flow = self._combine_flow(flow)
+        return feature, label, node_matrix, flow
     
     def _combine_node_connection(self, node_matries:list | tuple):
         matrix_size = 0
         for i in node_matries:
-            matrix_size += i.size(0)
-        combined_matrix = torch.zeros(matrix_size, matrix_size).to(self.device)
+            matrix_size += i.size(0)-1
+        combined_matrix = torch.zeros(matrix_size+1, matrix_size+1).to(self.device)
 
         start = 0
         for node_matrix in node_matries:
-            end = start + node_matrix.size(0)
-            combined_matrix[start:end, start:end] += node_matrix
+            end = start + node_matrix.size(0)-1
+            combined_matrix[start:end, start:end] += node_matrix[:-1,:-1]
             start = end
+        outdoor_connection = torch.cat([matrix[:-1,-1] for matrix in node_matries])
+        outdoor_connection = torch.cat([outdoor_connection, torch.ones(1).to(self.device)])
+        combined_matrix[-1,:] += outdoor_connection
+        combined_matrix[:,-1] += outdoor_connection
         return combined_matrix
-
+    
+    def _combine_flow(self, flows:list | tuple):
+        start = 0
+        for i in flows:
+            lenght = i[:,:-1].max().item() + 1
+            i[:,:-1] += start
+            start += lenght
+        return torch.cat(flows,dim=0)
+    
 if __name__ == '__main__':
     dataset = NodeDataset()
     print(dataset[0])

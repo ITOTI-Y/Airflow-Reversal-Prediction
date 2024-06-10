@@ -1,6 +1,8 @@
 import numpy as np
 from .node import Node
+from .config import CALCULATE_CONFIG
 
+ENV_CONFIG = CALCULATE_CONFIG()
 
 class Connection:
     """A class used to represent a Connection in a Ventilation Network.
@@ -36,7 +38,7 @@ class Connection:
         self.node2 = node2  # 连接的房间2
         self.coefficient = coefficient  # 阻力系数
         self.outside_pressure = outside_pressure  # 室外风压 Pa
-        self.outside_concentration = 400  # 室外浓度 ppm
+        self.outside_concentration = ENV_CONFIG.OUTSIDE_CONCENTRATION  # 室外浓度 ppm
         self.flow = 0  # 气流流量,正值表示从room1流向room2,负值表示从room2流向room1
 
     def calculate_flow(self, pressure1: float, pressure2: float) -> float:

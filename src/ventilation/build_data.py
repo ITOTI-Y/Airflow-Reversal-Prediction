@@ -1,9 +1,9 @@
 from .network import VentilationNetwork
 from .caculation import *
+from .config import CALCULATE_CONFIG
 import pathlib
 
-TOTAL_TIME = 200
-TIME_STEP = 5
+ENV_CONFIG = CALCULATE_CONFIG()
 
 def step_data(network: VentilationNetwork, caculation: Caculation, output: bool = False, show=False):
     """Main function to run the calculation.
@@ -20,9 +20,10 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
     caculation.flow_balance()
     result = {f'Node {node.identifier}': {'time': [], 'pressure': [],
                                           'concentration': [], 'people': [], 'size':[]} for node in caculation.nodes}
-    for _ in range(3):
+    result['Node Outside'] = {'time': [], 'pressure': [],'concentration': [], 'people': [], 'size':[]}
+    for _ in range(ENV_CONFIG.PEOPLE_CHANGE_TIMES):
         times, concentration_list = caculation.concentration_calculation(
-            total_time=TOTAL_TIME, time_step=TIME_STEP)
+            total_time=ENV_CONFIG.TIME_OF_EACH, time_step=ENV_CONFIG.TIME_STEP)
         for i, node in enumerate(caculation.nodes):
             result[f'Node {node.identifier}']['time'].extend(times[:, 0])
             result[f'Node {node.identifier}']['concentration'].extend(
@@ -34,13 +35,22 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
             result[f'Node {node.identifier}']['size'].extend(
                 [node.size]*len(concentration_list[:, i]))
             network.random_people_number()
+        result['Node Outside']['time'].extend(times[:, 0])
+        result['Node Outside']['concentration'].extend(concentration_list[:, -1])
+        result['Node Outside']['people'].extend((np.zeros_like(concentration_list[:, -1]).astype(int)))
+        
     if output:
         outside_node_num = sum(
             [1 for conn in network.connections if conn.node2 == None])
         path = pathlib.Path(__file__).parents[2].joinpath('data')
         path.mkdir(parents=True, exist_ok=True)
         name = f'N{len(network.nodes)}_C{len(network.connections)}_O{outside_node_num}'
-        flow = [[conn.node1.identifier,conn.node2.identifier,conn.flow] for conn in network.connections if conn.node2 is not None]
+        flow = []
+        for conn in network.connections:
+            if conn.node2 is not None:
+                flow.append([conn.node1.identifier, conn.node2.identifier, conn.flow])
+            else:
+                flow.append([conn.node1.identifier, None, conn.flow])
         pd.DataFrame(flow, columns=['Node1', 'Node2', 'Flow']).to_csv(
             path.joinpath(name + '_flow.csv'), index=False)
         caculation.output_result(result).to_csv(
