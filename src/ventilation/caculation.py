@@ -4,7 +4,7 @@ from typing import List
 from .node import Node
 from .connection import Connection
 from .network import VentilationNetwork
-from .config import CALCULATE_CONFIG
+from ..config import CALCULATE_CONFIG
 from scipy.optimize import root
 
 ENV_CONFIG = CALCULATE_CONFIG()

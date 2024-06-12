@@ -1,7 +1,7 @@
 import numpy as np
 from .node import Node
 from .connection import Connection
-from .config import CALCULATE_CONFIG
+from ..config import CALCULATE_CONFIG
 import matplotlib.pyplot as plt
 import networkx as nx
 

@@ -5,7 +5,7 @@ class CALCULATE_CONFIG:
         self.OUTSIDE_PRESSURE_RANGE = (1, 10)
         self.OUTSIDE_NODE_NUM = (2, 5)
 
-        self.NODE_NUM_RANGE = (4, 12)
+        self.NODE_NUM_RANGE = (4, 6)
         self.NODE_SIZE_RANGE = (25, 60)
         self.NODE_PEOPLE_RANGE = (1, 10)
 

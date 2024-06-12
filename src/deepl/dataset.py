@@ -1,9 +1,14 @@
 import pathlib
 import torch
+import pandas as pd
+import numpy as np
 from torch.utils.data import Dataset,DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from .prep import prep_data
-from ..utils.flow import compute_net_flow
+from ..utils.flow import *
+from ..config import CALCULATE_CONFIG
+
+ENV_CONFIG = CALCULATE_CONFIG()
 
 class NodeDataset(Dataset):
     def __init__(self, data_path:str=None, device=None):
@@ -51,6 +56,7 @@ class NodeDataLoader(DataLoader):
         feature, label, node_matrix, flow = zip(*batch)
         feature = torch.cat([i for i in feature],axis=0)
         label = torch.cat([i for i in label],axis=0)
+        label,feature = self._conbine_outside_node(label=label, feature=feature)
         node_matrix = self._combine_node_connection(node_matrix)
         flow = self._combine_flow(flow)
         return feature, label, node_matrix, flow
@@ -78,7 +84,21 @@ class NodeDataLoader(DataLoader):
             lenght = i[:,:-1].max().item() + 1
             i[:,:-1] += start
             start += lenght
-        return torch.cat(flows,dim=0)
+        temp = torch.cat(flows,dim=0)
+        temp[temp.isinf()] = temp[:,:-1].max() + 1
+        for t in temp:
+            node1, node2, value = t[0].item(), t[1].item(), t[2].item()
+            if t[0] > t[1]:
+                t[0], t[1] = node2, node1
+                t[2] = -value
+        temp = pd.DataFrame(temp.cpu()).sort_values(by=[0,1]).values
+        return torch.tensor(temp).to(self.device)
+    
+    def _conbine_outside_node(self, label:torch.Tensor, feature:torch.Tensor,) -> torch.Tensor:
+        outside_node_feature = torch.ones((1,feature.size(1),feature.size(2))) * torch.tensor([ENV_CONFIG.OUTSIDE_CONCENTRATION,-1,-1])
+        outside_node_label = torch.ones((1,label.size(1))) * torch.tensor([ENV_CONFIG.OUTSIDE_CONCENTRATION])
+        return torch.cat([label, outside_node_label.to(self.device)], axis=0),torch.cat([feature, outside_node_feature.to(self.device)], axis=0)
+
     
 if __name__ == '__main__':
     dataset = NodeDataset()

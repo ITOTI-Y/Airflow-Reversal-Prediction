@@ -3,6 +3,9 @@ import torch.nn as nn
 from torch_geometric.nn import GATConv
 from torch_geometric.data import Data, Batch
 from torch_geometric.nn.models import GAT
+from ..config import CALCULATE_CONFIG
+
+ENV_CONFIG = CALCULATE_CONFIG()
 
 
 def adj_to_edge_index(adj):
@@ -97,16 +100,22 @@ class PINNLayer(nn.Module):
         self.conv = nn.Conv2d(in_dim, out_dim, size)
         pass
 
-    def _people_exhaled(self, people, size):
-        HUMAN_EXHALATION = 0.0001  # 人体潮气量 m^3/s
-        HUMAN_EXHALATION_CONCENTRATION = 40000  # 人体潮气二氧化碳浓度 ppm
-        HUMAN_EXHALATION_FLOW = HUMAN_EXHALATION * \
-            HUMAN_EXHALATION_CONCENTRATION  # 人体潮气二氧化碳流量 ppm*m^3/s
+    def _people_exhaled(self, people:torch.Tensor , size:torch.Tensor) -> torch.Tensor:
+        result = torch.zeros_like(people)
         for i, value in enumerate(people):
-            people[i] = HUMAN_EXHALATION_FLOW * value.item()/size[i].item()
-        return people
+            result[i] = ENV_CONFIG.HUMAN_EXHALATION_FLOW * value.item()/size[i].item()
+        return result
+    
+    def _flow_conv(self, flow):
+        flow = flow.unsqueeze(0)
+        flow = flow.permute(0, 3, 1, 2)
+        # x: [1, num_features, edge_index, time]
+        flow = self.conv(flow)  # Conv features with 1x1 kernel
+        flow = flow.permute(0, 2, 3, 1).squeeze(0)
+        # x: [1, edge_index, time, num_features]
+        return flow
 
-    def forward(self, origin_data, flow, edge_index, time_step=5):
+    def forward(self, origin_data, flow, edge_index):
         # origin_data: [Multiple batch nodes, time, num_features]
         # x: [edge_index, time, num_features]
         # edge_index: [2, edge_index]
@@ -115,25 +124,22 @@ class PINNLayer(nn.Module):
         node_list = torch.zeros_like(edge_index.unique(
         ), device=flow.device, dtype=torch.float32, requires_grad=True)
         concentration = origin_data[:, -1, 0]
+        mask = torch.ones_like(concentration)
+        mask[-1] = 0
         size = origin_data[:, -1, 2]
         people = origin_data[:, -1, 1]
-        flow = flow.unsqueeze(0)
-        flow = flow.permute(0, 3, 1, 2)
-        # x: [1, num_features, edge_index, time]
-        flow = self.conv(flow)  # Conv features with 1x1 kernel
-        flow = flow.permute(0, 2, 3, 1).squeeze(0)
-        # x: [1, edge_index, time, num_features]
+        flow = self._flow_conv(flow)
         flow_clone = flow.clone()
         node_list_new = node_list.clone()  # 避免破坏计算图
         for _, (conn, value) in enumerate(zip(edge_index.T, flow)):
             if conn[0] != conn[1]:
                 node_list_new[conn[0]] -= value.item()*concentration[conn[0]
-                                                                     ].item()/size[conn[0]].item() * time_step
+                                                                     ].item()/size[conn[0]].item() * ENV_CONFIG.TIME_STEP
                 node_list_new[conn[1]] += value.item()*concentration[conn[0]
-                                                                     ].item()/size[conn[1]].item() * time_step
-        result = concentration + node_list_new + \
-            self._people_exhaled(people, size) * time_step
-        return result.unsqueeze(1), flow_clone
+                                                                     ].item()/size[conn[1]].item() * ENV_CONFIG.TIME_STEP
+        result = concentration + (node_list_new + \
+            self._people_exhaled(people, size) * ENV_CONFIG.TIME_STEP) * mask
+        return result.unsqueeze(1), torch.cat([edge_index.T, flow[:, :, 0]], axis=1)
 
 
 class Temporal_GAT_Transformer(nn.Module):
@@ -155,11 +161,11 @@ class Temporal_GAT_Transformer(nn.Module):
         # x: [Multiple batch nodes, num_features]
         # flow: [Node1, Node2, num_features]
 
-    def forward(self, origin_data, node_matrix):
-        x = self.gat(origin_data, node_matrix)
+    def forward(self, feature, node_matrix):
+        x = self.gat(feature, node_matrix)
         x = self.positon_encoding(x)
         x = self.transformer(x)
         flow, edge_index = self.weights(
             x, node_matrix, weights=True)  # GAT attention weights get flow information
-        x, flow = self.pinn(origin_data, flow, edge_index)
-        return x, torch.cat([edge_index.T, flow[:, :, 0]], axis=1)
+        x, flow = self.pinn(feature, flow, edge_index)
+        return x, flow

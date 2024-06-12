@@ -1,6 +1,6 @@
 import numpy as np
 from .node import Node
-from .config import CALCULATE_CONFIG
+from ..config import CALCULATE_CONFIG
 
 ENV_CONFIG = CALCULATE_CONFIG()
 

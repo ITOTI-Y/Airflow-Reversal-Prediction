@@ -1,7 +1,8 @@
 from .network import VentilationNetwork
 from .caculation import *
-from .config import CALCULATE_CONFIG
+from ..config import CALCULATE_CONFIG
 import pathlib
+import numpy as np
 
 ENV_CONFIG = CALCULATE_CONFIG()
 
@@ -35,10 +36,6 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
             result[f'Node {node.identifier}']['size'].extend(
                 [node.size]*len(concentration_list[:, i]))
             network.random_people_number()
-        result['Node Outside']['time'].extend(times[:, 0])
-        result['Node Outside']['concentration'].extend(concentration_list[:, -1])
-        result['Node Outside']['people'].extend((np.zeros_like(concentration_list[:, -1]).astype(int)))
-        
     if output:
         outside_node_num = sum(
             [1 for conn in network.connections if conn.node2 == None])
@@ -50,7 +47,7 @@ def step_data(network: VentilationNetwork, caculation: Caculation, output: bool 
             if conn.node2 is not None:
                 flow.append([conn.node1.identifier, conn.node2.identifier, conn.flow])
             else:
-                flow.append([conn.node1.identifier, None, conn.flow])
+                flow.append([conn.node1.identifier, -np.inf, conn.flow])
         pd.DataFrame(flow, columns=['Node1', 'Node2', 'Flow']).to_csv(
             path.joinpath(name + '_flow.csv'), index=False)
         caculation.output_result(result).to_csv(
