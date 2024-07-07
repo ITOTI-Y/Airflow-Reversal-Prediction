@@ -1,6 +1,6 @@
 import torch
 
-def compute_net_flow(flows: torch.Tensor) -> torch.Tensor:
+def flows_to_matrix(flows: torch.Tensor) -> torch.Tensor:
     """
     Compute the net flow of the flows.
 
@@ -10,20 +10,14 @@ def compute_net_flow(flows: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: output's device is the same as the input's device
     """
-    flow_dict = {}
     if not isinstance(flows, torch.Tensor):
         flows = torch.tensor(flows)
+
+    size = int(flows[:, :-1].max().item()) + 1
+    flow_matrix = torch.zeros((size,size)).to(flows.device)
+    mask = torch.triu(torch.ones(size,size),diagonal=1).to(flows.device)
     for flow in flows:
-        node1, node2, value = flow[0].item(), flow[1].item(), flow[2].item()
-        if node1 == node2:
-            continue
-        elif (node1,node2) in flow_dict:
-            flow_dict[(node1,node2)] += value
-        elif (node2,node1) in flow_dict:
-            flow_dict[(node2,node1)] -= value
-        else:
-            flow_dict[(node1,node2)] = value
-    result = []
-    for i, (node1,node2) in enumerate(flow_dict.keys()):
-        result.append(torch.tensor((node1, node2, flow_dict[(node1,node2)])))
-    return torch.stack(result).to(flows.device)
+        flow_matrix[int(flow[0]),int(flow[1])] += flow[2]
+    flow_matrix = (flow_matrix - flow_matrix.T)
+    flow_matrix = flow_matrix * mask
+    return flow_matrix

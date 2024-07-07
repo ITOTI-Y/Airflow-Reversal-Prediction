@@ -31,13 +31,33 @@ class NodeDataset(Dataset):
                 node_matrix[building_identifier] = torch.from_numpy(values).to(self.device)
             elif "_flow" in file_path.name:
                 building_identifier, values = prep_data(file_path)
-                values = compute_net_flow(values)
+                values = self._compute_net_flow(values)
                 flow[building_identifier] = values.to(self.device)
             else:
                 building_identifier, values, label = prep_data(file_path)
                 feature[building_identifier] = torch.from_numpy(values).to(self.device)
                 labels[building_identifier] = torch.from_numpy(label).to(self.device)
         return feature, labels, node_matrix, flow
+    
+    def _compute_net_flow(self, flows:torch.Tensor) -> torch.Tensor:
+        flow_dict = {}
+        if not isinstance(flows, torch.Tensor):
+            flows = torch.tensor(flows)
+        for flow in flows:
+            node1, node2, value = flow[0].item(), flow[1].item(), flow[2]
+            if node1 == node2:
+                continue
+            elif (node1,node2) in flow_dict:
+                flow_dict[(node1,node2)] += value.clone()
+            elif (node2,node1) in flow_dict:
+                flow_dict[(node2,node1)] -= value.clone()
+            else:
+                flow_dict[(node1,node2)] = value.clone()
+        result = []
+        for i, (node1,node2) in enumerate(flow_dict.keys()):
+            result.append(torch.tensor((node1, node2, flow_dict[(node1,node2)])))
+        return torch.stack(result).to(flows.device)
+    
     
     def __len__(self):
         return len(self.feature)
