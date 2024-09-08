@@ -12,6 +12,13 @@ ENV_CONFIG = CALCULATE_CONFIG()
 
 class NodeDataset(Dataset):
     def __init__(self, data_path:str=None, device=None):
+        """
+        _summary_
+
+        Args:
+            data_path (str): _description_. Defaults to None.
+            device (_type_, optional): _description_. Defaults to None.
+        """        
         if data_path is not None:
             self.data_path = pathlib.Path(data_path)
         else:
@@ -21,6 +28,7 @@ class NodeDataset(Dataset):
         self.keys = list(self.feature.keys())
 
     def _build_dataset(self):
+        
         feature = {}
         labels = {}
         flow = {}
