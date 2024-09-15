@@ -13,7 +13,7 @@ ENV_CONFIG = CALCULATE_CONFIG()
 class NodeDataset(Dataset):
     def __init__(self, data_path:str=None, device=None):
         """
-        _summary_
+        Hello World
 
         Args:
             data_path (str): _description_. Defaults to None.
