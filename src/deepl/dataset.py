@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset,DataLoader
 from torch.nn.utils.rnn import pad_sequence
+from typing import Tuple
 from .prep import prep_data
 from ..utils.flow import *
 from ..config import CALCULATE_CONFIG
@@ -14,7 +15,7 @@ class NodeDataset(Dataset):
     def __init__(self, data_path:str=None, device=None):
         """Initializes an instance of the NodeDataset class.
 
-        This function provides two choices of data_path creating,and it also define the device to perform.
+        This function provides two choices of data_path creating, and it also define the device to perform.
 
         Args:
             data_path (str, optional): The path to the dataset.   
@@ -86,11 +87,26 @@ class NodeDataset(Dataset):
     
     
     def __len__(self):
-        # Return the number of features in the dataset.Returns:int.
+        """Return the number of data
+        
+        Returns:
+            len(self.feature): The number of data
+        """
         return len(self.feature)
     
     def __getitem__(self, idx):
-        # Get an item from the dataset by its index.Args:idx(int).Returns:tuple,including:feature,labels,connection_matrices,flow.
+        """Get an item from the dataset by its index.
+    
+        Args:
+            idx (int): The index of the item to retrieve.
+    
+        Returns:
+            tuple: A tuple containing:
+                - feature
+                - labels
+                - connection_matrices
+                - flow
+        """
         key = self.keys[idx]
         return self.feature[key], self.labels[key], self.connection_matrices[key], self.flow[key]
     
@@ -98,10 +114,17 @@ class NodeDataLoader(DataLoader):
     def __init__(self, dataset, *args, **kwargs):
         """Initialize the instance of NodeDataLoader class.
 
-        During initialization, this method performs the following tasks:  
-        1. Calls the parent class DataLoader's __init__ method with the provided dataset and any additional arguments.  
-        2. Sets the `collate_fn` attribute to a custom collation function, `_collate_fn`, which will be used to combine multiple samples into a single batch during data loading.  
-        3. Sets the `device` attribute to the device specified in the dataset. This allows for easy device transfer of data during the training/inference process.
+        This method initializes the NodeDataLoader by calling the parent DataLoader's __init__,
+        setting a custom collation function, and storing the dataset's device.
+
+        Args:
+            dataset: The dataset to load data from.
+            *args: Variable length argument list to pass to the parent DataLoader.
+            **kwargs: Arbitrary keyword arguments to pass to the parent DataLoader.
+
+        Note:
+            - Sets the `collate_fn` attribute to a custom `_collate_fn` method.
+            - Sets the `device` attribute to the device specified in the dataset.
 
         """
         super().__init__(dataset, *args, **kwargs)
@@ -109,21 +132,48 @@ class NodeDataLoader(DataLoader):
         self.device = dataset.device
     
     def _collate_fn(self, batch):
-        feature, label, node_matrix, flow = zip(*batch) # Unpack the batch data.
-        feature = torch.cat([i for i in feature],axis=0) # Concatenate features of each sample along the first dimension.
-        label = torch.cat([i for i in label],axis=0) # Concatenate labels of each sample along the first dimension.
-        label,feature = self._conbine_outside_node(label=label, feature=feature) # Process the concatenated features and labels.
-        node_matrix = self._combine_node_connection(node_matrix) # Combine the node connection matrices.
-        flow = self._combine_flow(flow) # Combine the flow data.
+        """Collates and processes batch data for the DataLoader.
+    
+        This method unpacks the batch, concatenates features and labels,
+        processes the data, and combines node connections and flow data.
+    
+        Args:
+            batch: A list of tuples, where each tuple contains feature, label,
+                   node_matrix, and flow data for a single sample.
+    
+        Returns:
+            tuple: A tuple containing:
+                - feature (torch.Tensor): Concatenated and processed feature data.
+                - label (torch.Tensor): Concatenated and processed label data.
+                - node_matrix: Combined node connection matrices.
+                - flow: Combined flow data.
+        """
+        feature, label, node_matrix, flow = zip(*batch)
+        feature = torch.cat([i for i in feature],axis=0)
+        label = torch.cat([i for i in label],axis=0)
+        label,feature = self._conbine_outside_node(label=label, feature=feature)
+        node_matrix = self._combine_node_connection(node_matrix)
+        flow = self._combine_flow(flow)
         return feature, label, node_matrix, flow
     
     def _combine_node_connection(self, node_matries:list | tuple):
-        """Combine the adjacency matrices of multiple graphs into a single larger matrix.Consider the connection to the outdoor environment.
-
+        """Combines adjacency matrices of multiple graphs into a single larger matrix.
+    
+        This method combines multiple adjacency matrices into one, considering
+        connections to the outdoor environment. It creates a new matrix where
+        individual graphs are placed along the diagonal, and outdoor connections
+        are represented in the last row and column.
+    
         Args:
-            node_matrices (list | tuple): A list or tuple containing the adjacency matrices of the individual graphs.
+            node_matries: A list or tuple of adjacency matrices (torch.Tensor)
+                for individual graphs. Each matrix should have an extra row and
+                column for outdoor connections.
+    
         Returns:
-            torch.Tensor: The combined adjacency matrix.
+            torch.Tensor: The combined adjacency matrix, including outdoor connections.
+    
+        Raises:
+            ValueError: If node_matries is empty or contains non-tensor elements.
         """
         matrix_size = 0
         for i in node_matries:
@@ -142,18 +192,29 @@ class NodeDataLoader(DataLoader):
         combined_matrix[:,-1] += outdoor_connection
         return combined_matrix
     
-    def _combine_flow(self, flows:list | tuple):
-        """Combine multiple flows, ensuring node indices are unique across the combined flow, and handling the direction of edges.
-        Combine multiple flow data, typically representing edges in a directed graph with weights or flows.
-
+    def _combine_flow(self, flows:List[torch.Tensor] | Tuple[torch.Tensor,]):
+       """Combines multiple flow data sets into a single, unified flow representation.
+    
+        This method processes and combines multiple flow data tensors, typically representing
+        edges in a directed graph. It ensures node indices are unique across the combined
+        flow and handles the direction of edges.
+    
         Args:
-            flows: list | tuple  
-            A list or tuple containing multiple flow data, where each flow data is a Tensor. 
-            Each row of the Tensor represents an edge, typically containing three elements: start node index, end node index, and edge weight (or flow).
-
+            flows: A list or tuple of flow data tensors. Each tensor is of shape (N, 3),
+                where N is the number of edges, and each row contains 
+                [start_node, end_node, edge_weight].
+    
         Returns:
-            A combined flow as a torch.tensor, where node indices have been renumbered for uniqueness across the entire combined flow, and edge directions have been handled.
-
+            torch.Tensor: A combined flow tensor of shape (M, 3), where M is the total
+                number of edges across all input flows. Each row contains
+                [start_node, end_node, edge_weight], where:
+                - Node indices have been renumbered for uniqueness.
+                - Edge directions have been standardized (start_node < end_node).
+                - Rows are sorted by start_node, then end_node.
+    
+        Note:
+            - Infinite values in the input are replaced with (max_node_index + 1).
+            - The method uses pandas for sorting, which may impact performance for large datasets.
         """
         start = 0
         for i in flows:
@@ -181,16 +242,20 @@ class NodeDataLoader(DataLoader):
         temp = pd.DataFrame(temp.cpu()).sort_values(by=[0,1]).values
         return torch.tensor(temp).to(self.device)
     
-    def _conbine_outside_node(self, label:torch.Tensor, feature:torch.Tensor,) -> torch.Tensor:
+    def _conbine_outside_node(self, label:torch.Tensor, feature:torch.Tensor,) -> Tuple[torch.Tensor,torch.Tensor]:
         """Adds features and labels for an outside (or virtual) node to the existing label and feature tensors.
-        
-        Args:  
-            label: torch.Tensor.The existing tensor of node labels, where each row represents the label of a node.  
-            feature: torch.Tensor.The existing tensor of node features, where each row represents the feature vector of a node.  
-  
-        Returns:  
-            tuple[torch.Tensor, torch.Tensor]  
-            A tuple containing two tensors: the updated label tensor (including the outside node's label),and the updated feature tensor (including the outside node's features).
+    
+        Args:
+            label (torch.Tensor): The existing tensor of node labels. Shape: (N, L) where N is the number of nodes
+                and L is the number of label dimensions.
+            feature (torch.Tensor): The existing tensor of node features. Shape: (N, T, F) where N is the number of nodes,
+                T is the number of time steps, and F is the number of feature dimensions.
+    
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing:
+                - Updated label tensor (including the outside node's label). Shape: (N+1, L)
+                - Updated feature tensor (including the outside node's features). Shape: (N+1, T, F)
+    
         """
         outside_node_feature = torch.ones((1,feature.size(1),feature.size(2))) * torch.tensor([ENV_CONFIG.OUTSIDE_CONCENTRATION,-1,-1])
         outside_node_label = torch.ones((1,label.size(1))) * torch.tensor([ENV_CONFIG.OUTSIDE_CONCENTRATION])
