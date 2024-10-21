@@ -8,7 +8,7 @@ from ..utils.flow import *
 
 class Train():
     def __init__(self, data_path:str=None):
-        self.device = torch.device('cuda' if torch.cuda else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.dataset = NodeDataset(data_path, device=self.device)
         self.dataloader = NodeDataLoader(self.dataset, batch_size=1, shuffle=True)
     def train(self,epochs:int=1000):
